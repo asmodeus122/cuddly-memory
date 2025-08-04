@@ -1,41 +1,59 @@
-# Compiled Lua sources
-luac.out
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-# luarocks build files
-*.src.rock
-*.zip
-*.tar.gz
+local defenseActive = false
+local defenseDistance = 15 -- distância para ativar a defesa
 
-# Object files
-*.o
-*.os
-*.ko
-*.obj
-*.elf
+local lastDefendTime = 0
+local baseCooldown = 1 -- tempo base entre defesas (segundos)
 
-# Precompiled Headers
-*.gch
-*.pch
+-- Encontra a bola no workspace
+local function findBall()
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name == "BladeBall" and obj:IsA("BasePart") then
+            return obj
+        end
+    end
+    return nil
+end
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-*.def
-*.exp
+-- Função de defesa: pular
+local function defend()
+    if humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+-- Liga/desliga defesa com tecla M
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.M then
+        defenseActive = not defenseActive
+        print("Defesa automática:", defenseActive and "Ativada" or "Desativada")
+    end
+end)
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+RunService.RenderStepped:Connect(function()
+    if not defenseActive then return end
 
+    local ball = findBall()
+    if ball then
+        local distance = (ball.Position - humanoidRootPart.Position).Magnitude
+        if distance <= defenseDistance then
+            -- velocidade da bola (magnitude da velocidade)
+            local ballVelocity = ball.AssemblyLinearVelocity.Magnitude
+
+            -- quanto maior a velocidade, menor o cooldown, mas com um limite mínimo de 0.2s
+            local cooldown = math.clamp(baseCooldown - (ballVelocity / 50), 0.2, baseCooldown)
+
+            if tick() - lastDefendTime >= cooldown then
+                defend()
+                lastDefendTime = tick()
+            end
+        end
+    end
+end)
